@@ -2,10 +2,11 @@ MXNet-Gluon-SyncBN
 ==================
 created by `Hang Zhang <http://hangzh.com/>`_
 
-A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN) [1]_ . We follow the sync-onece implmentation described in the paper [2]_ . If you are not familiar with Synchronized Batch Normalization, please see this `blog <http://hangzh.com/SynchronizeBN/>`_.
+A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN) [1]_ . We follow the sync-onece implmentation described in the paper [2]_ . If you are not familiar with Synchronized Batch Normalization, please see this `blog <http://hangzh.com/SynchronizeBN/>`_. Special thanks to [Haibin](https://github.com/eric-haibin-lin) for the technical support!
 
 Jump to:
-- `How to use Synchronized Batch Normalization`_
+
+- `How to use SyncBN`_
 - `MNIST example <https://github.com/zhanghang1989/MXNet-Gluon-SyncBN/blob/master/mnist.ipynb>`_
 - `Load Pre-trained Network`_
 
@@ -18,10 +19,9 @@ Install MXNet from Source
 .. code:: bash
 
     # clone the branch
-    git clone https://github.com/zhanghang1989/incubator-mxnet
-    git checkout syncbn
+    git clone -b syncbatchnorm --recursive https://github.com/zhanghang1989/incubator-mxnet
     # compile mxnet
-    make -j $(nproc) USE_OPENCV=1 USE_BLAS=openblas USE_CUDA=1 USE_CUDA_PATH=/usr/local/cuda USE_CUDNN=1
+    cd incubator-mxnet && make -j $(nproc) USE_OPENCV=1 USE_BLAS=openblas USE_CUDA=1 USE_CUDA_PATH=/usr/local/cuda USE_CUDNN=1
     # install python API
     cd python && python setup.py install
 
@@ -36,7 +36,7 @@ How to use SyncBN
     from mxnet import gluon, autograd
     from mxnet.gluon import nn
     from mxnet.gluon.nn import Block
-
+    # import SyncBN here
     from syncbn import BatchNorm, ModelDataParallel
 
     # create your own Block

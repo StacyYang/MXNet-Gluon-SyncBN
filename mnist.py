@@ -2,6 +2,7 @@ from __future__ import print_function
 import numpy as np
 import mxnet as mx
 from mxnet import nd, autograd, gluon
+from mxnet.gluon import nn
 from syncbn import BatchNorm, ModelDataParallel
 
 mx.random.seed(1)
@@ -37,7 +38,7 @@ with net.name_scope():
     net.add(gluon.nn.Flatten())
     net.add(gluon.nn.Dense(num_fc,in_units=800))
     net.add(gluon.nn.Activation('relu'))
-    net.add(gluon.nn.Dense(num_outputs))
+    net.add(gluon.nn.Dense(num_outputs, in_units=num_fc))
 
 # Initializae the model wieghts and get Parallel mode
 net.collect_params().initialize(mx.init.Xavier(magnitude=2.24))
