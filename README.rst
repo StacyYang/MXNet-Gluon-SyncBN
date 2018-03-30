@@ -2,7 +2,7 @@ MXNet-Gluon-SyncBN
 ==================
 created by `Hang Zhang <http://hangzh.com/>`_
 
-A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN) [1]_ . We follow the sync-onece implmentation described in the paper [2]_ . If you are not familiar with Synchronized Batch Normalization, please see this `blog <http://hangzh.com/SynchronizeBN/>`_. Special thanks to [Haibin](https://github.com/eric-haibin-lin) for the technical support!
+A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN) [1]_ . We follow the sync-onece implmentation described in the paper [2]_ . If you are not familiar with Synchronized Batch Normalization, please see this `blog <http://hangzh.com/SynchronizeBN/>`_. Special thanks to `Haibin <https://github.com/eric-haibin-lin>`_ for the technical support.
 
 Jump to:
 
@@ -28,7 +28,7 @@ Install MXNet from Source
 How to use SyncBN
 -----------------
 
-``from syncbn import BatchNorm`` and  use ModelDataParallel with the network (input and output are both a list of NDArray). Everything else looks almost the same as before
+``from syncbn import BatchNorm`` and  use ModelDataParallel with the network (input and output are both a list of NDArray). Everything else looks the same as before
 
 .. code:: python
 

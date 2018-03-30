@@ -5,8 +5,6 @@ from mxnet import nd, autograd, gluon
 from mxnet.gluon import nn
 from syncbn import BatchNorm, ModelDataParallel
 
-mx.random.seed(1)
-
 # Set the contexts (suppose using 4 GPUs)
 nGPUs = 4
 ctx_list = [mx.gpu(i) for i in range(nGPUs)]
@@ -47,7 +45,7 @@ print(net)
 
 # Loss and Optimizer
 softmax_cross_entropy = gluon.loss.SoftmaxCrossEntropyLoss()
-trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': .1})
+trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': .01})
 
 # Write evaluation loop
 def evaluate_accuracy(data_iterator, net):
