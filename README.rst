@@ -1,8 +1,8 @@
 MXNet-Gluon-SyncBN
 ==================
-created by [Hang Zhang](http://hangzh.com/)
+`Hang Zhang <http://hangzh.com/>`_
 
-A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN)[1]_. We follow the sync-onece implmentation described in the paper[2]_. If you are not familiar with Synchronized Batch Normalization, please see this [blog](http://hangzh.com/SynchronizeBN/).
+A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN)[1]_. We follow the sync-onece implmentation described in the paper[2]_. If you are not familiar with Synchronized Batch Normalization, please see this `blog <http://hangzh.com/SynchronizeBN/>`_.
 
 Jump to:
 - `How to use Synchronized Batch Normalization`_
@@ -67,8 +67,8 @@ How to use SyncBN
 
 **Note**: you have to use ModelDataParallel to do network forward (input and output are both a list of NDArray).
 
-`MNIST Example
---------------
+MNIST Example
+-------------
 
 Please visit the `python notebook <https://github.com/zhanghang1989/MXNet-Gluon-SyncBN/blob/master/mnist.ipynb>`_
 
