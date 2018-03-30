@@ -26,7 +26,7 @@ Install MXNet from Source
 How to use SyncBN
 -----------------
 
-``from syncbn import BatchNorm`` and everything else looks the same as before::
+``from syncbn import BatchNorm`` and  use ModelDataParallel with the network (input and output are both a list of NDArray). Everything else looks almost the same as before::
 
     import mxnet as mx
     from mxnet import gluon, autograd
@@ -48,7 +48,6 @@ How to use SyncBN
             x = self.conv(x)
             x = self.bn(x)
             x = self.relu(x)
-            x.wait_to_read()
             return x
 
     # set the contexts (suppose using 4 GPUs)
@@ -64,7 +63,6 @@ How to use SyncBN
     with autograd.record():
         y = model(x)
 
-**Note**: you have to use ModelDataParallel with the network (input and output are both a list of NDArray), add ``x.wait_to_read()`` at the end of ``forward()`` function.
 
 MNIST Example
 -------------

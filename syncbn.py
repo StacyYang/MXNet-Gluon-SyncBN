@@ -134,8 +134,8 @@ def _parallel_apply(module, inputs, kwargs_tup=None):
             if is_training:
                 with autograd.record():
                     output = module(input, **kwargs)
+                    output.wait_to_read()
             else:
-                #with autograd.record(False):
                 output = module(input, **kwargs)
             with lock:
                 results[i] = output
