@@ -1,8 +1,8 @@
 MXNet-Gluon-SyncBN
 ==================
-`Hang Zhang <http://hangzh.com/>`_
+created by `Hang Zhang <http://hangzh.com/>`_
 
-A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN)[1]_. We follow the sync-onece implmentation described in the paper[2]_. If you are not familiar with Synchronized Batch Normalization, please see this `blog <http://hangzh.com/SynchronizeBN/>`_.
+A preview tutorial for MXNet Gluon Synchronized Batch Normalization (SyncBN) [1]_ . We follow the sync-onece implmentation described in the paper [2]_ . If you are not familiar with Synchronized Batch Normalization, please see this `blog <http://hangzh.com/SynchronizeBN/>`_.
 
 Jump to:
 - `How to use Synchronized Batch Normalization`_
@@ -64,8 +64,7 @@ How to use SyncBN
     with autograd.record():
         y = model(x)
 
-
-**Note**: you have to use ModelDataParallel to do network forward (input and output are both a list of NDArray).
+**Note**: you have to use ModelDataParallel with the network (input and output are both a list of NDArray), add ``x.wait_to_read()`` at the end of ``forward()`` function.
 
 MNIST Example
 -------------
