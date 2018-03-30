@@ -13,7 +13,9 @@ Install MXNet from Source
 -------------------------
 
 * Please follow the MXNet docs to `install dependencies <http://mxnet.incubator.apache.org/install/index.html>`_
-* Clone and install `syncbn branch <https://github.com/zhanghang1989/incubator-mxnet/tree/syncbn>`_::
+* Clone and install `syncbn branch <https://github.com/zhanghang1989/incubator-mxnet/tree/syncbn>`_
+
+.. code:: bash
 
     # clone the branch
     git clone https://github.com/zhanghang1989/incubator-mxnet
@@ -26,7 +28,9 @@ Install MXNet from Source
 How to use SyncBN
 -----------------
 
-``from syncbn import BatchNorm`` and  use ModelDataParallel with the network (input and output are both a list of NDArray). Everything else looks almost the same as before::
+``from syncbn import BatchNorm`` and  use ModelDataParallel with the network (input and output are both a list of NDArray). Everything else looks almost the same as before
+
+.. code:: python
 
     import mxnet as mx
     from mxnet import gluon, autograd
@@ -59,7 +63,7 @@ How to use SyncBN
     model = ModelDataParallel(model, ctx_list)
     # load the data
     data = mx.random.uniform(-1,1,(8, 3, 24, 24))
-    x = inputs = gluon.utils.split_and_load(data, ctx_list=ctx_list)
+    x = gluon.utils.split_and_load(data, ctx_list=ctx_list)
     with autograd.record():
         y = model(x)
 

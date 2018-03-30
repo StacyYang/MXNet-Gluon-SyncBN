@@ -93,12 +93,6 @@ class BatchNorm(Block):
                                         name='fwd', **self._kwargs)
         else:
             ctx = x.context
-            """
-            return nd.BatchNorm(x, self.gamma.data(ctx), self.beta.data(ctx),
-                               self.running_mean.data(ctx), 
-                               self.running_var.data(ctx), name='fwd', 
-                               **self._kwargs)
-            """
             return nd.DecoupleBatchNorm(x, self.gamma.data(ctx), self.beta.data(ctx), 
                                         self.running_mean.data(ctx), 
                                         self.running_var.data(ctx), name='fwd', 
@@ -137,6 +131,7 @@ def _parallel_apply(module, inputs, kwargs_tup=None):
                     output.wait_to_read()
             else:
                 output = module(input, **kwargs)
+                output.wait_to_read()
             with lock:
                 results[i] = output
         except Exception as e:
