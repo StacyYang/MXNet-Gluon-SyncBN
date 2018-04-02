@@ -78,6 +78,9 @@ Load Pre-trained Network
 
 **TODO**
 
+`常见问答 <https://github.com/zhanghang1989/MXNet-Gluon-SyncBN/blob/master/ChineseQA.md>`_
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Reference
 ---------
 
