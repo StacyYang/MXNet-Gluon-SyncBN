@@ -61,7 +61,7 @@ def evaluate_accuracy(data_iterator, net):
     return acc.get()[1]
 
 # start training
-epochs = 1
+epochs = 5
 smoothing_constant = .01
 
 for e in range(epochs):

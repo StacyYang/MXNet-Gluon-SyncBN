@@ -93,10 +93,10 @@ class BatchNorm(Block):
                                         name='fwd', **self._kwargs)
         else:
             ctx = x.context
-            return nd.DecoupleBatchNorm(x, self.gamma.data(ctx), self.beta.data(ctx), 
-                                        self.running_mean.data(ctx), 
-                                        self.running_var.data(ctx), name='fwd', 
-                                        **self._kwargs)
+            return nd.BatchNorm(x, self.gamma.data(ctx), self.beta.data(ctx),
+                               self.running_mean.data(ctx), 
+                               self.running_var.data(ctx), name='fwd', 
+                               **self._kwargs)
 
     def __repr__(self):
         s = '{name}({content}'
