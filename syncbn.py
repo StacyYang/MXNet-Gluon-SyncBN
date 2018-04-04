@@ -9,6 +9,30 @@ from mxnet.gluon import HybridBlock, Block
 __all__ = ['ModelDataParallel', 'BatchNorm']
 
 class ModelDataParallel(Block):
+    """Data parallelism
+
+    Inputs and outputs are both list of NDArrays in different contexts.
+    In the forward pass, the module is replicated on each device,
+    and each replica handles a portion of the input. During the backwards
+    pass, gradients from each replica are summed into the original module.
+
+    Parameters
+    ----------
+    module : object
+        Network to be parallelized.
+    ctx : list
+        A list of contexts to use.
+    Inputs:
+        - **data**: input tensor with arbitrary shape.
+    Outputs:
+        - **out**: output tensor with the same shape as `data`.
+
+
+    Example::
+
+        >>> net = ModelDataParallel(model, ctx=[mx.gpu(0), mx.gpu(1)])
+        >>> y = net(x)
+    """
     def __init__(self, module, ctx):
         super(ModelDataParallel, self).__init__()
         self.ctx = ctx
@@ -19,7 +43,50 @@ class ModelDataParallel(Block):
         return _parallel_apply(self.module, inputs)
 
 
-class BatchNorm(Block):
+class BatchNorm(HybridBlock):
+    """Cross-GPU Synchronized Batch normalization (SyncBN)
+    Normalizes the input with a mini-batch, then scale and shift.
+
+    Parameters
+    ----------
+    axis : int, default 1
+        The axis that should be normalized. This is typically the channels
+        (C) axis. For instance, after a `Conv2D` layer with `layout='NCHW'`,
+        set `axis=1` in `BatchNorm`. If `layout='NHWC'`, then set `axis=3`.
+    momentum: float, default 0.9
+        Momentum for the moving average.
+    epsilon: float, default 1e-5
+        Small float added to variance to avoid dividing by zero.
+    center: bool, default True
+        If True, add offset of `beta` to normalized tensor.
+        If False, `beta` is ignored.
+    scale: bool, default True
+        If True, multiply by `gamma`. If False, `gamma` is not used.
+        When the next layer is linear (also e.g. `nn.relu`),
+        this can be disabled since the scaling
+        will be done by the next layer.
+    use_global_stats: bool, default False
+        If True, use global moving statistics instead of local batch-norm. This will force
+        change batch-norm into a scale shift operator.
+        If False, use local batch-norm.
+    beta_initializer: str or `Initializer`, default 'zeros'
+        Initializer for the beta weight.
+    gamma_initializer: str or `Initializer`, default 'ones'
+        Initializer for the gamma weight.
+    moving_mean_initializer: str or `Initializer`, default 'zeros'
+        Initializer for the moving mean.
+    moving_variance_initializer: str or `Initializer`, default 'ones'
+        Initializer for the moving variance.
+    in_channels : int, default 0
+        Number of channels (feature maps) in input data. If not specified,
+        initialization will be deferred to the first time `forward` is called
+        and `in_channels` will be inferred from the shape of input data.
+    nGPUs : int, default number of visible GPUs
+    Inputs:
+        - **data**: input tensor with arbitrary shape.
+    Outputs:
+        - **out**: output tensor with the same shape as `data`.
+    """
     def __init__(self, momentum=0.9, epsilon=1e-5, center=True, scale=True,
                  beta_initializer='zeros', gamma_initializer='ones',
                  running_mean_initializer='zeros', running_variance_initializer='ones',
@@ -68,34 +135,31 @@ class BatchNorm(Block):
             dtype = 'float32'
         super(BatchNorm, self).cast(dtype)
 
-    def forward(self, x):
+    def hybrid_forward(self, F, x, gamma, beta, running_mean, running_var):
         if autograd.is_training():
             isum, isqu = nd.SumSquare(x)
-            # reduce sum
+            # reduce sum for E(x) and E(x^2)
             idsum = self.xsum.push(isum)
             idsqu = self.xsqu.push(isqu)
             osum = self.xsum.get(idsum)
             osqu = self.xsqu.get(idsqu)
             assert(len(self.xsum) == len(self.xsqu))
-            ctx = x.context
             N = len(self.xsum)*x.shape[0]*x.shape[2]*x.shape[3]
-            # calc mean and var
+            # calc mean and std
             mean = osum / N
             sumvar = osqu - osum * osum / N
             std = nd.sqrt(sumvar / N + self.eps)
             # update running mean and var
             with autograd.pause():
                 unbias_var = sumvar / (N - 1)
+                ctx = x.context
                 self.updater(self.running_mean, self.running_var, mean, unbias_var,
                              self.momentum, ctx)
-            return nd.DecoupleBatchNorm(x, self.gamma.data(ctx), self.beta.data(ctx), 
-                                        mean, std,
+            return nd.DecoupleBatchNorm(x, gamma, beta, mean, std,
                                         name='fwd', **self._kwargs)
         else:
             ctx = x.context
-            return nd.BatchNorm(x, self.gamma.data(ctx), self.beta.data(ctx),
-                               self.running_mean.data(ctx), 
-                               self.running_var.data(ctx), name='fwd', 
+            return nd.BatchNorm(x, gamma, beta, running_mean, running_var, name='fwd', 
                                **self._kwargs)
 
     def __repr__(self):

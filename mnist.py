@@ -22,7 +22,7 @@ test_data = gluon.data.DataLoader(gluon.data.vision.MNIST(train=False, transform
 
 # Define a convolutional neural network
 num_fc = 512
-net = gluon.nn.Sequential()
+net = gluon.nn.HybridSequential()
 with net.name_scope():
     net.add(gluon.nn.Conv2D(in_channels=1, channels=20, kernel_size=5))
     net.add(BatchNorm(in_channels=20, nGPUs=nGPUs))
