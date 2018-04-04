@@ -1,14 +1,13 @@
 import threading
 
 import mxnet as mx
-from mxnet import ndarray as nd
 from mxnet import autograd, test_utils, autograd
 from mxnet.ndarray import NDArray
-from mxnet.gluon import HybridBlock, Block
+from mxnet.gluon import HybridBlock
 
 __all__ = ['ModelDataParallel', 'BatchNorm']
 
-class ModelDataParallel(Block):
+class ModelDataParallel(HybridBlock):
     """Data parallelism
 
     Inputs and outputs are both list of NDArrays in different contexts.
@@ -45,7 +44,9 @@ class ModelDataParallel(Block):
 
 class BatchNorm(HybridBlock):
     """Cross-GPU Synchronized Batch normalization (SyncBN)
-    Normalizes the input with a mini-batch, then scale and shift.
+    Standard BN [1]_ implementation only normalize the data within each device.
+    SyncBN normalizes the input within the whole mini-batch.
+    We follow the sync-onece implmentation described in the paper [2]_ .
 
     Parameters
     ----------
@@ -86,6 +87,13 @@ class BatchNorm(HybridBlock):
         - **data**: input tensor with arbitrary shape.
     Outputs:
         - **out**: output tensor with the same shape as `data`.
+    
+
+    Reference:
+
+        .. [1] Ioffe, Sergey, and Christian Szegedy. "Batch normalization: Accelerating deep network training by reducing internal covariate shift." *ICML 2015*
+
+        .. [2] Hang Zhang, Kristin Dana, Jianping Shi, Zhongyue Zhang, Xiaogang Wang, Ambrish Tyagi, and Amit Agrawal. "Context Encoding for Semantic Segmentation." *CVPR 2018*
     """
     def __init__(self, momentum=0.9, epsilon=1e-5, center=True, scale=True,
                  beta_initializer='zeros', gamma_initializer='ones',
@@ -137,29 +145,29 @@ class BatchNorm(HybridBlock):
 
     def hybrid_forward(self, F, x, gamma, beta, running_mean, running_var):
         if autograd.is_training():
-            isum, isqu = nd.SumSquare(x)
+            isum, isqu = F.SumSquare(x)
             # reduce sum for E(x) and E(x^2)
             idsum = self.xsum.push(isum)
             idsqu = self.xsqu.push(isqu)
-            osum = self.xsum.get(idsum)
-            osqu = self.xsqu.get(idsqu)
+            osum = self.xsum.get(F, idsum)
+            osqu = self.xsqu.get(F, idsqu)
             assert(len(self.xsum) == len(self.xsqu))
             N = len(self.xsum)*x.shape[0]*x.shape[2]*x.shape[3]
             # calc mean and std
             mean = osum / N
             sumvar = osqu - osum * osum / N
-            std = nd.sqrt(sumvar / N + self.eps)
+            std = F.sqrt(sumvar / N + self.eps)
             # update running mean and var
             with autograd.pause():
                 unbias_var = sumvar / (N - 1)
                 ctx = x.context
                 self.updater(self.running_mean, self.running_var, mean, unbias_var,
                              self.momentum, ctx)
-            return nd.DecoupleBatchNorm(x, gamma, beta, mean, std,
-                                        name='fwd', **self._kwargs)
+            return F.DecoupleBatchNorm(x, gamma, beta, mean, std,
+                                       name='fwd', **self._kwargs)
         else:
             ctx = x.context
-            return nd.BatchNorm(x, gamma, beta, running_mean, running_var, name='fwd', 
+            return F.BatchNorm(x, gamma, beta, running_mean, running_var, name='fwd', 
                                **self._kwargs)
 
     def __repr__(self):
@@ -171,6 +179,88 @@ class BatchNorm(HybridBlock):
         return s.format(name=self.__class__.__name__,
                         content=', '.join(['='.join([k, v.__repr__()])
                                            for k, v in self._kwargs.items()]))
+
+
+class SharedUpdater:
+    # update only once
+    def __init__(self, nGPUs):
+        self.mutex = threading.Lock()
+        self.nGPUs = nGPUs
+        self._clear()
+
+    def _clear(self):
+        self.tasks = self.nGPUs
+
+    def __call__(self, running_mean, running_var, mean, unbias_var, momentum, ctx):
+        with self.mutex:
+            if self.tasks == self.nGPUs:
+                running_mean.set_data(momentum * running_mean.data(ctx) + \
+                    (1.0 - momentum) * mean)
+                running_var.set_data(momentum * running_var.data(ctx) + \
+                    (1.0 - momentum) * unbias_var)
+            self.tasks -= 1
+        if self.tasks == 0:
+            self._clear()
+
+
+class SharedTensor:
+    def __init__(self, nGPUs):
+        self.mutex = threading.Lock()
+        self.all_tasks_done = threading.Condition(self.mutex)
+        self.nGPUs = nGPUs
+        self._clear()
+
+    def _clear(self):
+        self.list = []
+        self.push_tasks = self.nGPUs
+        self.reduce_tasks = self.nGPUs
+
+    def push(self, t):
+        with self.mutex:
+            if self.push_tasks == 0:
+                self._clear()
+            self.list.append(t)
+            idx = len(self.list) - 1
+            self.push_tasks -= 1
+
+        with self.all_tasks_done:
+            if self.push_tasks == 0:
+                self.all_tasks_done.notify_all()
+            while self.push_tasks:
+                self.all_tasks_done.wait()
+        return idx
+
+    def _reduce(self, F):
+        with self.mutex:
+            if self.reduce_tasks == 1:
+                assert(len(self.list) == self.nGPUs)
+                self.list = F.AllReduce(*self.list)
+                for xi in self.list:
+                    # mannually attach grad to avoid wrong allocation
+                    xi.attach_grad()
+                    xi.wait_to_read()
+                self.reduce_tasks -= 1
+            else:
+                self.reduce_tasks -= 1
+
+        with self.all_tasks_done:
+            if self.reduce_tasks == 0:
+                self.all_tasks_done.notify_all()
+            while self.reduce_tasks:
+                self.all_tasks_done.wait()
+
+    def get(self, F, idx):
+        self._reduce(F)
+        return self.list[idx]
+
+    def test(self):
+        print('self.list', self.list)
+
+    def __len__(self):
+        return len(self.list)
+
+    def __repr__(self):
+        return 'SharedTensor'
 
 
 def _parallel_apply(module, inputs, kwargs_tup=None):
@@ -208,7 +298,7 @@ def _parallel_apply(module, inputs, kwargs_tup=None):
         is_training = False
 
     threads = [threading.Thread(target=_worker,
-                                args=(i, module, input, kwargs, results, 
+                                args=(i, module, input, kwargs, results,
                                       is_training, lock),
                                 )
                for i, (input, kwargs) in
@@ -219,91 +309,9 @@ def _parallel_apply(module, inputs, kwargs_tup=None):
     for thread in threads:
         thread.join()
     outputs = []
-        
     for i in range(len(inputs)):
         output = results[i]
         if isinstance(output, Exception):
             raise output
         outputs.append(output)
     return outputs
-
-
-class SharedUpdater:
-    # update only once
-    def __init__(self, nGPUs):
-        self.mutex = threading.Lock()
-        self.nGPUs = nGPUs
-        self._clear()
-
-    def _clear(self):
-        self.tasks = self.nGPUs
-
-    def __call__(self, running_mean, running_var, mean, unbias_var, momentum, ctx):
-        with self.mutex:
-            if self.tasks == self.nGPUs:
-                running_mean.set_data(momentum * running_mean.data(ctx) + \
-                    (1.0 - momentum) * mean)
-                running_var.set_data(momentum * running_var.data(ctx) + \
-                    (1.0 - momentum) * unbias_var)
-            self.tasks -= 1
-        if self.tasks == 0:
-            self._clear()
-
-class SharedTensor:
-    def __init__(self, nGPUs):
-        self.mutex = threading.Lock()
-        self.all_tasks_done = threading.Condition(self.mutex)
-        self.nGPUs = nGPUs
-        self._clear()
-
-    def _clear(self):
-        self.list = []
-        self.push_tasks = self.nGPUs
-        self.reduce_tasks = self.nGPUs
-
-    def push(self, t):
-        with self.mutex:
-            if self.push_tasks == 0:
-                self._clear()
-            self.list.append(t)
-            idx = len(self.list) - 1
-            self.push_tasks -= 1
-
-        with self.all_tasks_done:
-            if self.push_tasks == 0:
-                self.all_tasks_done.notify_all()
-            while self.push_tasks:
-                self.all_tasks_done.wait()
-        return idx
-
-    def _reduce(self):
-        with self.mutex:
-            if self.reduce_tasks == 1:
-                assert(len(self.list) == self.nGPUs)
-                self.list = nd.AllReduce(*self.list)
-                for xi in self.list:
-                    # mannually attach grad to avoid wrong allocation
-                    xi.attach_grad()
-                    xi.wait_to_read()
-                self.reduce_tasks -= 1
-            else:
-                self.reduce_tasks -= 1
-
-        with self.all_tasks_done:
-            if self.reduce_tasks == 0:
-                self.all_tasks_done.notify_all()
-            while self.reduce_tasks:
-                self.all_tasks_done.wait()
-
-    def get(self, idx):
-        self._reduce()
-        return self.list[idx]
-
-    def test(self):
-        print('self.list', self.list)
-
-    def __len__(self):
-        return len(self.list)
-
-    def __repr__(self):
-        return 'SharedTensor'
