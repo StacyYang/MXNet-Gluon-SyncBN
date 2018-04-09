@@ -38,7 +38,7 @@ class ModelDataParallel(object):
         >>> x = gluon.utils.split_and_load(data, ctx_list=ctx)
         >>> y = net(x)
     """
-    def __init__(self, module, ctx, sync=False):
+    def __init__(self, module, ctx, sync=True):
         self.ctx = ctx
         module.collect_params().reset_ctx(ctx=ctx)
         self.module = module
