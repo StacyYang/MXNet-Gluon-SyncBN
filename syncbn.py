@@ -7,7 +7,7 @@ from mxnet.gluon import HybridBlock
 
 __all__ = ['ModelDataParallel', 'BatchNorm']
 
-class ModelDataParallel(HybridBlock):
+class ModelDataParallel(object):
     """Data parallelism
 
     Inputs and outputs are both list of NDArrays in different contexts.
@@ -21,25 +21,40 @@ class ModelDataParallel(HybridBlock):
         Network to be parallelized.
     ctx : list
         A list of contexts to use.
-    Inputs:
-        - **data**: input tensor with arbitrary shape.
-    Outputs:
-        - **out**: output tensor with the same shape as `data`.
 
+
+    Inputs:
+
+        - **inputs**: list of input (NDArrays)
+
+    Outputs:
+
+        - **outputs**: list of output (NDArrays)
 
     Example::
 
-        >>> net = ModelDataParallel(model, ctx=[mx.gpu(0), mx.gpu(1)])
+        >>> ctx = [mx.gpu(0), mx.gpu(1)]
+        >>> net = ModelDataParallel(model, ctx=ctx)
+        >>> x = gluon.utils.split_and_load(data, ctx_list=ctx)
         >>> y = net(x)
     """
-    def __init__(self, module, ctx):
-        super(ModelDataParallel, self).__init__()
+    def __init__(self, module, ctx, sync=False):
         self.ctx = ctx
-        module.collect_params().reset_ctx(ctx = ctx)
+        module.collect_params().reset_ctx(ctx=ctx)
         self.module = module
+        self.sync = sync
 
-    def forward(self, inputs):
-        return _parallel_apply(self.module, inputs)
+    def __call__(self, inputs):
+        if self.sync:
+            return _parallel_apply(self.module, inputs)
+        else:
+            if isinstance(inputs, NDArray):
+                return self.module(inputs)
+            if len(inputs) == 1:
+                return (self.module(inputs[0]), )
+
+            outputs = [self.module(X) for X in inputs]
+            return outputs
 
 
 class BatchNorm(HybridBlock):
