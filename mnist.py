@@ -45,7 +45,7 @@ print(net)
 
 # Loss and Optimizer
 softmax_cross_entropy = gluon.loss.SoftmaxCrossEntropyLoss()
-trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': .01})
+trainer = gluon.Trainer(net.module.collect_params(), 'sgd', {'learning_rate': .01})
 
 # Write evaluation loop
 def evaluate_accuracy(data_iterator, net):
